@@ -49,18 +49,7 @@ export default function ProfitDashboard({ outputs }: Props) {
         />
       </div>
 
-      <div className="space-y-3 pt-2">
-        <AffiliateBox
-          titre="Le Compte Pro des E-commerçants"
-          description="Un compte pro dédié, sans frais cachés, pour suivre votre trésorerie."
-          lien="#"
-        />
-        <AffiliateBox
-          titre="Baissez votre CPA"
-          description="Le marketing email est le levier le plus rentable. Klaviyo est le leader pour Shopify."
-          lien="#"
-        />
-      </div>
+      {/* Section AffiliateBox retirée */}
     </section>
   );
 }

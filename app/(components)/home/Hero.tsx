@@ -14,7 +14,7 @@ export default function Hero() {
             Utilisable gratuitement, directement sur cette page.
           </p>
           <div className="mt-10 flex items-center justify-center gap-4">
-            <a href="#tool" className="rounded-md bg-gray-900 text-white px-6 py-3 text-base font-semibold hover:bg-gray-800 transition">
+            <a href="#tool" className="rounded-md bg-blue-600 text-white px-6 py-3 text-base font-semibold hover:bg-blue-700 transition">
               Essayer l'outil gratuit ↓
             </a>
             <Link href="#features" className="text-gray-700 hover:text-gray-900 font-medium">
