@@ -3,12 +3,8 @@
 import { useState, useRef } from "react";
 import InputPanel from "./InputPanel";
 import ProfitDashboard from "./ProfitDashboard";
-import dynamic from "next/dynamic";
-// Chart.js dynamique avec un état de chargement propre
-const Chart = dynamic(() => import("react-chartjs-2").then(mod => mod.Line), { 
-  ssr: false,
-  loading: () => <div className="h-full w-full flex items-center justify-center text-blue-300 text-sm animate-pulse">Chargement du graphique...</div>
-});
+
+import { Line } from "react-chartjs-2";
 
 import { Chart as ChartJS, LineElement, PointElement, LineController, CategoryScale, LinearScale, Title, Tooltip, Legend } from "chart.js";
 ChartJS.register(LineElement, PointElement, LineController, CategoryScale, LinearScale, Title, Tooltip, Legend);
@@ -25,6 +21,18 @@ const defaultInputs = {
   cpa: 10,
 };
 
+// Interface pour les paramètres de calcul (sans id)
+interface CalculParams {
+  prixVente: number;
+  coutAchat: number;
+  coutExpedition: number;
+  fraisPlateformePct: number;
+  fraisPlateformeFixe: number;
+  fraisPaiementPct: number;
+  fraisPaiementFixe: number;
+  cpa: number;
+}
+
 function calculer({
   prixVente,
   coutAchat,
@@ -34,7 +42,7 @@ function calculer({
   fraisPaiementPct,
   fraisPaiementFixe,
   cpa,
-}: typeof defaultInputs) {
+}: CalculParams) {
   const fraisPlateforme = prixVente * (fraisPlateformePct / 100) + fraisPlateformeFixe;
   const fraisPaiement = prixVente * (fraisPaiementPct / 100) + fraisPaiementFixe;
   const coutRevientTotal = coutAchat + coutExpedition + fraisPlateforme + fraisPaiement + cpa;
@@ -78,9 +86,22 @@ export default function ProfitCalculator() {
   };
 
   const currentProduct = products[selected];
-  const outputs = calculer(currentProduct);
+  
+  // Extraire seulement les propriétés nécessaires pour calculer
+  const calculParams: CalculParams = {
+    prixVente: currentProduct.prixVente,
+    coutAchat: currentProduct.coutAchat,
+    coutExpedition: currentProduct.coutExpedition,
+    fraisPlateformePct: currentProduct.fraisPlateformePct,
+    fraisPlateformeFixe: currentProduct.fraisPlateformeFixe,
+    fraisPaiementPct: currentProduct.fraisPaiementPct,
+    fraisPaiementFixe: currentProduct.fraisPaiementFixe,
+    cpa: currentProduct.cpa,
+  };
+  
+  const outputs = calculer(calculParams);
 
-  // Données Graphique (inchangées)
+  // Données Graphique
   const chartData = {
     labels: Array.from({ length: 21 }, (_, i) => (30 + i * 2)),
     datasets: [
@@ -88,7 +109,7 @@ export default function ProfitCalculator() {
         label: "Marge nette (€)",
         data: Array.from({ length: 21 }, (_, i) => {
           const prixVente = 30 + i * 2;
-          const o = calculer({ ...currentProduct, prixVente });
+          const o = calculer({ ...calculParams, prixVente });
           return o.margeNette;
         }),
         borderColor: "#2563eb",
@@ -99,7 +120,7 @@ export default function ProfitCalculator() {
         label: "ROAS cible",
         data: Array.from({ length: 21 }, (_, i) => {
           const prixVente = 30 + i * 2;
-          const o = calculer({ ...currentProduct, prixVente });
+          const o = calculer({ ...calculParams, prixVente });
           return o.roasCible;
         }),
         borderColor: "#16a34a",
@@ -112,14 +133,19 @@ export default function ProfitCalculator() {
 
   const chartOptions = {
     responsive: true,
-    maintainAspectRatio: false, // Permet au graphique de mieux remplir le conteneur
+    maintainAspectRatio: false,
     plugins: {
       legend: { display: true },
-      tooltip: { enabled: true, mode: 'index', intersect: false }, // Tooltip amélioré
+      tooltip: { enabled: true, mode: 'index' as const, intersect: false },
     },
     scales: {
       y: { beginAtZero: true, title: { display: true, text: 'Marge (€)' } },
-      y1: { beginAtZero: true, position: 'right' as const, title: { display: true, text: 'ROAS' }, grid: { drawOnChartArea: false } },
+      y1: { 
+        beginAtZero: true, 
+        position: 'right' as const, 
+        title: { display: true, text: 'ROAS' }, 
+        grid: { drawOnChartArea: false } 
+      },
     },
   };
 
@@ -133,7 +159,6 @@ export default function ProfitCalculator() {
   };
 
   return (
-    // Padding ajusté sur mobile (p-4) vs desktop (p-10) pour l'espace
     <div className="w-full max-w-6xl mx-auto bg-gradient-to-br from-blue-50 via-white to-blue-100 p-4 md:p-8 lg:p-10 rounded-2xl shadow-lg border border-blue-100 transition-all">
       
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
@@ -165,7 +190,6 @@ export default function ProfitCalculator() {
         </div>
       </div>
 
-      {/* Zone des onglets améliorée : Scroll horizontal sur mobile + Bouton supprimer */}
       <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
         {products.map((p, i) => (
           <div
@@ -180,7 +204,6 @@ export default function ProfitCalculator() {
             `}
           >
             Produit {i + 1}
-            {/* Croix de suppression visible uniquement au survol ou si sélectionné, et s'il y a plus d'1 produit */}
             {products.length > 1 && (
                 <button
                     onClick={(e) => removeProduct(e, i)}
@@ -195,7 +218,6 @@ export default function ProfitCalculator() {
       </div>
 
       <div className="mt-6 md:mt-10 grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-        {/* Passer selected pour optimiser le rendu */}
         <InputPanel inputs={currentProduct} onInputChange={e => handleInputChange(e, selected)} />
         <ProfitDashboard outputs={outputs} />
       </div>
@@ -207,7 +229,7 @@ export default function ProfitCalculator() {
             Évolution de la marge & ROAS
           </h3>
           <div className="h-64 md:h-72 w-full">
-            <Chart data={chartData} options={chartOptions} />
+            <Line data={chartData} options={chartOptions} />
           </div>
         </div>
       </div>
