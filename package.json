@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@netlify/next": "^1.4.9",
     "chart.js": "^4.5.1",
     "framer-motion": "^10.18.0",
     "lucide-react": "^0.452.0",
