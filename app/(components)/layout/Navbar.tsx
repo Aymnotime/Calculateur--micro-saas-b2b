@@ -14,6 +14,8 @@ export default function Navbar() {
         <div className="hidden md:flex flex-1 items-center justify-center gap-8 text-sm font-medium">
           <Link href="/" className="text-gray-700 hover:text-gray-900 transition">Accueil</Link>
           <a href="#features" className="text-gray-700 hover:text-gray-900 transition">Fonctionnalités</a>
+          <Link href="/calculateur" className="text-gray-700 hover:text-gray-900 transition">Calculateur Vitale</Link>
+          <Link href="/calculateur-nir" className="text-gray-700 hover:text-gray-900 transition">Calculateur NIR</Link>
           <Link href="/blog" className="text-gray-700 hover:text-gray-900 transition">Blog</Link>
           <Link href="/contact" className="text-gray-700 hover:text-gray-900 transition">Contact</Link>
         </div>
@@ -30,6 +32,8 @@ export default function Navbar() {
         <div className="md:hidden border-t border-gray-200 bg-white/90 backdrop-blur px-4 pb-4 space-y-4">
           <Link href="/" className="block pt-4 text-gray-700">Accueil</Link>
           <a href="#features" className="block text-gray-700">Fonctionnalités</a>
+          <Link href="/calculateur" className="block text-gray-700">Calculateur Vitale</Link>
+          <Link href="/calculateur-nir" className="block text-gray-700">Calculateur NIR</Link>
           <Link href="/blog" className="block text-gray-700">Blog</Link>
           <Link href="/contact" className="block text-gray-700">Contact</Link>
           {/* Bouton Se connecter retiré */}
