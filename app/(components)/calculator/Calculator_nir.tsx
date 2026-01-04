@@ -35,6 +35,8 @@ interface ValidationResult {
   birthCommune?: string;
   birthOrder?: number;
   calculatedKey?: number;
+  providedKey?: number;
+  keyIsValid?: boolean;
   isForeignBorn?: boolean;
   isTemporaryNumber?: boolean;
 }
@@ -47,7 +49,17 @@ const VALID_EXAMPLES = [
 
 const calculateNIRKey = (nir13Digits: string): number => {
   if (nir13Digits.length !== 13) return 0;
-  const nirNumber = BigInt(nir13Digits);
+  
+  // Gestion spéciale Corse : 2A → 19, 2B → 18
+  let nirForCalculation = nir13Digits;
+  const dept = nir13Digits.substring(5, 7);
+  if (dept === '2A') {
+    nirForCalculation = nir13Digits.substring(0, 5) + '19' + nir13Digits.substring(7);
+  } else if (dept === '2B') {
+    nirForCalculation = nir13Digits.substring(0, 5) + '18' + nir13Digits.substring(7);
+  }
+  
+  const nirNumber = BigInt(nirForCalculation);
   const remainder = Number(nirNumber % 97n);
   return 97 - remainder;
 };
@@ -63,15 +75,15 @@ const validateSecurityNumber = (num: string): ValidationResult => {
     };
   }
   
-  if (cleanNum.length !== 13) {
+  if (cleanNum.length !== 13 && cleanNum.length !== 15) {
     return {
       isValid: false,
       message: 'Format invalide',
-      details: ['Le numéro doit contenir exactement 13 chiffres']
+      details: ['Le numéro doit contenir 13 chiffres (sans clé) ou 15 chiffres (avec clé)']
     };
   }
   
-  if (!/^\d{13}$/.test(cleanNum)) {
+  if (!/^\d{13,15}$/.test(cleanNum)) {
     return {
       isValid: false,
       message: 'Format invalide',
@@ -79,12 +91,17 @@ const validateSecurityNumber = (num: string): ValidationResult => {
     };
   }
   
-  const genderCode = parseInt(cleanNum.charAt(0));
-  const year = parseInt(cleanNum.substring(1, 3));
-  const month = parseInt(cleanNum.substring(3, 5));
-  const department = cleanNum.substring(5, 7);
-  const commune = cleanNum.substring(7, 10);
-  const birthOrder = parseInt(cleanNum.substring(10, 13));
+  // Extraire les 13 premiers chiffres et la clé si présente
+  const nir13 = cleanNum.substring(0, 13);
+  const providedKey = cleanNum.length === 15 ? parseInt(cleanNum.substring(13, 15)) : undefined;
+  const hasProvidedKey = cleanNum.length === 15;
+  
+  const genderCode = parseInt(nir13.charAt(0));
+  const year = parseInt(nir13.substring(1, 3));
+  const month = parseInt(nir13.substring(3, 5));
+  const department = nir13.substring(5, 7);
+  const commune = nir13.substring(7, 10);
+  const birthOrder = parseInt(nir13.substring(10, 13));
   
   const details: string[] = [];
   let isValid = true;
@@ -159,7 +176,19 @@ const validateSecurityNumber = (num: string): ValidationResult => {
     details.push('Numéro d\'ordre invalide (doit être entre 001 et 999)');
   }
   
-  const calculatedKey = calculateNIRKey(cleanNum);
+  const calculatedKey = calculateNIRKey(nir13);
+  let keyIsValid = true;
+  
+  // Vérification de la clé si fournie
+  if (hasProvidedKey && providedKey !== undefined) {
+    keyIsValid = providedKey === calculatedKey;
+    if (!keyIsValid) {
+      isValid = false;
+      details.push(`Clé de contrôle invalide : ${providedKey.toString().padStart(2, '0')} (attendu: ${calculatedKey.toString().padStart(2, '0')})`);
+    } else {
+      details.push('✓ Clé de contrôle valide');
+    }
+  }
   
   const currentYear = new Date().getFullYear();
   const currentYearShort = currentYear % 100;
@@ -198,6 +227,8 @@ const validateSecurityNumber = (num: string): ValidationResult => {
     birthCommune: commune,
     birthOrder,
     calculatedKey,
+    providedKey,
+    keyIsValid: hasProvidedKey ? keyIsValid : undefined,
     isForeignBorn,
     isTemporaryNumber
   };
@@ -238,10 +269,12 @@ export default function SecurityNumberCalculator() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleChange = (value: string) => {
-    const cleanValue = value.replace(/\D/g, '').substring(0, 13);
+    const cleanValue = value.replace(/\D/g, '').substring(0, 15);
     
     let formatted = cleanValue;
-    if (cleanValue.length > 10) {
+    if (cleanValue.length > 13) {
+      formatted = `${cleanValue.substring(0, 1)} ${cleanValue.substring(1, 3)} ${cleanValue.substring(3, 5)} ${cleanValue.substring(5, 7)} ${cleanValue.substring(7, 10)} ${cleanValue.substring(10, 13)} ${cleanValue.substring(13, 15)}`;
+    } else if (cleanValue.length > 10) {
       formatted = `${cleanValue.substring(0, 1)} ${cleanValue.substring(1, 3)} ${cleanValue.substring(3, 5)} ${cleanValue.substring(5, 7)} ${cleanValue.substring(7, 10)} ${cleanValue.substring(10, 13)}`;
     } else if (cleanValue.length > 7) {
       formatted = `${cleanValue.substring(0, 1)} ${cleanValue.substring(1, 3)} ${cleanValue.substring(3, 5)} ${cleanValue.substring(5, 7)} ${cleanValue.substring(7, 10)}`;
@@ -257,14 +290,14 @@ export default function SecurityNumberCalculator() {
     
     setIsCalculating(true);
     setTimeout(() => {
-      if (cleanValue.length === 13) {
+      if (cleanValue.length === 13 || cleanValue.length === 15) {
         const result = validateSecurityNumber(cleanValue);
         setValidation(result);
       } else if (cleanValue.length > 0) {
         setValidation({
           isValid: false,
           message: 'Numéro incomplet',
-          details: ['Saisissez les 13 chiffres pour la validation complète']
+          details: ['Saisissez 13 chiffres (sans clé) ou 15 chiffres (avec clé)']
         });
       } else {
         setValidation(null);
@@ -484,7 +517,7 @@ export default function SecurityNumberCalculator() {
                   Numéro de sécurité sociale
                 </label>
                 <span className="text-xs font-medium px-2 py-1 rounded-full bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 border border-emerald-200">
-                  13 chiffres
+                  13 ou 15 chiffres
                 </span>
               </div>
               
@@ -495,7 +528,7 @@ export default function SecurityNumberCalculator() {
                   value={number}
                   onChange={(e) => handleChange(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="1 88 02 75 123 456"
+                  placeholder="1 88 02 75 123 456 78"
                   className={`
                     w-full px-4 md:px-5 py-3 md:py-4 text-base md:text-lg border-2 rounded-xl 
                     focus:ring-4 focus:ring-cyan-500/20 focus:border-cyan-500 
@@ -506,7 +539,7 @@ export default function SecurityNumberCalculator() {
                     }
                     ${isEnterpriseMode ? 'shadow-lg shadow-cyan-500/5' : ''}
                   `}
-                  maxLength={18}
+                  maxLength={21}
                 />
                 
                 {number && (
@@ -547,7 +580,11 @@ export default function SecurityNumberCalculator() {
             
             {validation?.calculatedKey && (
               <div className={`rounded-xl p-4 md:p-6 border transition-all duration-300 ${
-                isEnterpriseMode
+                validation.keyIsValid === false
+                  ? 'bg-gradient-to-br from-red-50/50 to-red-100/50 border-red-300'
+                  : validation.keyIsValid === true
+                  ? 'bg-gradient-to-br from-emerald-50/50 to-emerald-100/50 border-emerald-300'
+                  : isEnterpriseMode
                   ? 'bg-gradient-to-br from-cyan-50/50 to-blue-50/50 border-cyan-300'
                   : 'bg-gradient-to-br from-slate-50 to-slate-100 border-slate-300'
               }`}>
@@ -566,9 +603,27 @@ export default function SecurityNumberCalculator() {
                 </div>
                 
                 <div className="space-y-3 md:space-y-4">
+                  {validation.providedKey !== undefined && (
+                    <div className={`bg-white rounded-lg p-3 md:p-4 border text-center ${
+                      validation.keyIsValid ? 'border-emerald-300' : 'border-red-300'
+                    }`}>
+                      <div className="space-y-1">
+                        <div className="text-xs font-medium text-slate-500">Clé fournie</div>
+                        <div className={`font-mono text-2xl md:text-4xl font-bold px-3 py-2 md:py-4 rounded border ${
+                          validation.keyIsValid
+                            ? 'text-emerald-700 bg-gradient-to-r from-emerald-50 to-emerald-100 border-emerald-300'
+                            : 'text-red-700 bg-gradient-to-r from-red-50 to-red-100 border-red-300'
+                        }`}>
+                          {validation.providedKey.toString().padStart(2, '0')}
+                          {validation.keyIsValid ? ' ✓' : ' ✗'}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="bg-white rounded-lg p-3 md:p-4 border border-slate-300 text-center">
                     <div className="space-y-1">
-                      <div className="text-xs font-medium text-slate-500">Clé calculée</div>
+                      <div className="text-xs font-medium text-slate-500">Clé {validation.providedKey !== undefined ? 'attendue' : 'calculée'}</div>
                       <div className={`font-mono text-2xl md:text-4xl font-bold px-3 py-2 md:py-4 rounded border ${
                         isEnterpriseMode
                           ? 'text-cyan-700 bg-gradient-to-r from-cyan-50 to-cyan-100 border-cyan-300'
